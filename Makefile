@@ -1,29 +1,27 @@
 # Makefile for the simple example kernel.
-AS86	=as86 -0 -a
-LD86	=ld86 -0
 AS	=as
 LD	=ld
-LDFLAGS =-m elf_i386 -Ttext 0 -e startup_32 -s -x -M  
+LDFLAGS =-m elf_i386 -Ttext 0 -s -x -M --oformat binary
+ASFLAGS =--gstabs+ --32
 
 all:	Image
 
+# 2880=80*2*18
 Image: boot system
-	dd bs=32 if=boot of=Image skip=1
-	objcopy -O binary system head
-	cat head >> Image
-
-disk: Image
-	dd bs=8192 if=Image of=/dev/fd0
-	sync;sync;sync
+	dd bs=512 count=2880 if=/dev/zero of=$@
+	dd bs=32 if=boot of=$@ conv=notrunc
+	dd bs=512 if=system of=$@ seek=1 conv=notrunc
+	sync
 
 head.o: head.s
+	$(AS) $(ASFLAGS) -o head.o head.s
 
 system:	head.o 
-	$(LD) $(LDFLAGS) head.o  -o system > System.map
+	$(LD) $(LDFLAGS) head.o  -o system -e startup_32 > System.map
 
 boot:	boot.s
-	$(AS86) -o boot.o boot.s
-	$(LD86) -s -o boot boot.o
+	$(AS) $(ASFLAGS) -o boot.o boot.s
+	$(LD) $(LDFLAGS) -e start -o boot boot.o
 
 clean:
-	rm -f Image System.map core boot head *.o system
+	rm -f Image System.map boot *.o system
